@@ -72,27 +72,26 @@ namespace VideoStreamAppWpf
         private void UpdateDeviceList()
         {
             this._deviceListBox.Items.Clear();
-            var list = VideoDevice.DeviceInfo.GetList();
-            foreach (var item in list) this._deviceListBox.Items.Add(item.Name);
+            var list = _videoDevice.GetDeviceNames();
+            foreach (var item in list) this._deviceListBox.Items.Add(item);
         }
+
+        private VideoDevice _videoDevice = new VideoDevice(800, 600);
 
         public MainWindow()
         {
             InitializeComponent();
-            this.Closed += new EventHandler(delegate (Object o, EventArgs e) { ReleaseResources(); });
-
-            UpdateDeviceList();
 
             this._connectButton.Click += _connectionButton_Click;
             this._refreshDeviceListButton.Click += new RoutedEventHandler(delegate (Object o, RoutedEventArgs a) { UpdateDeviceList(); ToLog("Refreshing devices..."); });
             this._clearLogButton.Click += new RoutedEventHandler(delegate (Object o, RoutedEventArgs a) { this._logTextBlock.Text = ""; });
 
-            Task.Run(ReceivedMessageAsync);
-        }
+            this._videoDevice.NewFrameEvent += VideoDeviceNewFrameEventHandler;
+            this._videoDevice.NotificationEvent += VideoDeviceNotificationEventHandler;
+            this._videoDevice.ErrorEvent += VideoDeviceErrorEventHandler;
 
-        private void ReleaseResources()
-        {
-            if (_videoCaptureDevice.IsRunning) _videoCaptureDevice.Stop();
+
+            Task.Run(ReceivedMessageAsync);
         }
 
         private void ToLog(string message)
@@ -107,27 +106,12 @@ namespace VideoStreamAppWpf
         {
             ToLog("Connection Init");
             var selectedItem = this._deviceListBox.SelectedItem;
-
-            var deviceList = VideoDevice.DeviceInfo.GetList();
-            string descriptor = "";
-            foreach (var item in deviceList) if (item.Name == selectedItem.ToString()) descriptor = item.Descriptor;
-
-            if (descriptor != "")
-            {
-                if (_videoCaptureDevice != null && _videoCaptureDevice.IsRunning) _videoCaptureDevice.Stop();
-                _videoCaptureDevice = null;
-                _videoCaptureDevice = new VideoCaptureDevice(descriptor);
-                _videoCaptureDevice.VideoSourceError += _videoCaptureDevice_VideoSourceError;
-                _videoCaptureDevice.NewFrame += _videoCaptureDevice_NewFrame;
-                _videoCaptureDevice.Start();
-            }
+            if (!_videoDevice.Open(selectedItem.ToString())) ToLog("Device Open Error");
 
             udpReceiver = new UdpClient(int.Parse(this._inputPortTextBox.Text), AddressFamily.InterNetworkV6);
             remotePort = int.Parse(this._remotePortTextBox.Text);
             remoteIp = this._remoteIpTextBox.Text;
         }
-
-        private VideoCaptureDevice _videoCaptureDevice = null;
 
         private void _videoCaptureDevice_VideoSourceError(object sender, AForge.Video.VideoSourceErrorEventArgs eventArgs)
         {
@@ -137,40 +121,25 @@ namespace VideoStreamAppWpf
         private string remoteIp;
         private int remotePort;
 
-        private void _videoCaptureDevice_NewFrame(object sender, AForge.Video.NewFrameEventArgs eventArgs)
+        private void VideoDeviceErrorEventHandler(string msg) { ToLog(msg); }
+        private void VideoDeviceNotificationEventHandler(string msg) { ToLog(msg); }
+
+        private void VideoDeviceNewFrameEventHandler(MemoryStream ms)
         {
-            try
+            Dispatcher.Invoke(() => 
             {
-                Dispatcher.Invoke(() =>
-                {
-                    using (MemoryStream ms = new MemoryStream())
-                    {
-                        Bitmap bitmap = new Bitmap(eventArgs.Frame, 800, 600);
-                        bitmap.Save(ms, ImageFormat.Jpeg);
-                        ms.Seek(0, SeekOrigin.Begin);
+                BitmapImage image = new BitmapImage();
+                image.BeginInit();
+                image.StreamSource = ms;
+                image.CacheOption = BitmapCacheOption.OnLoad;
+                image.EndInit();
 
-                        BitmapImage image = new BitmapImage();
-                        image.BeginInit();
-                        image.StreamSource = ms;
-                        image.CacheOption = BitmapCacheOption.OnLoad;
-                        image.EndInit();
-
-                        this._outputWebCameraImage.Source = image;
-
-                        byte[] data = ms.ToArray();
-                        UdpClient udpSender = new UdpClient(AddressFamily.InterNetworkV6);
-                        if (data.Length < 65535) udpSender.Send(data, data.Length, new IPEndPoint(IPAddress.Parse(remoteIp), remotePort));
-                        _statusTextBlock.Text = "Bytes sended: " + data.Length.ToString();
-                    }
-                });
-               
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.ToString());
-            }
-
-
+                this._outputWebCameraImage.Source = image;
+                byte[] data = ms.ToArray();
+                UdpClient udpSender = new UdpClient(AddressFamily.InterNetworkV6);
+                if (data.Length < 65535) udpSender.Send(data, data.Length, new IPEndPoint(IPAddress.Parse(remoteIp), remotePort));
+                _statusTextBlock.Text = "Bytes sended: " + data.Length.ToString();
+            });
         }
     }
 }

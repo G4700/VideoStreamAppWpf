@@ -25,6 +25,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Linq.Expressions;
+using System.Diagnostics.Tracing;
 
 namespace VideoStreamAppWpf
 {
@@ -33,6 +34,37 @@ namespace VideoStreamAppWpf
     /// </summary>
     public partial class MainWindow : Window
     {
+
+        UdpClient udpReceiver;
+        async void ReceivedMessageAsync()
+        {
+            while(true)
+            {
+                if (udpReceiver != null)
+                {
+                    var result = await udpReceiver.ReceiveAsync();
+
+                    Dispatcher.Invoke(() =>
+                    {
+                        using (MemoryStream ms = new MemoryStream(result.Buffer))
+                        {
+                            if (ms.Length != 0)
+                            {
+                                BitmapImage image = new BitmapImage();
+                                image.BeginInit();
+                                image.StreamSource = ms;
+                                image.CacheOption = BitmapCacheOption.OnLoad;
+                                image.EndInit();
+
+                                this._inputWebCameraImage.Source = image;
+                            }
+                        }
+                    });
+                }
+               
+            }
+        }
+
         private void UpdateDeviceList()
         {
             this._videoDeviceList.Items.Clear();
@@ -40,67 +72,30 @@ namespace VideoStreamAppWpf
             foreach (var item in list) this._videoDeviceList.Items.Add(item.Name);
         }
 
-        private UdpListener _udpListener;
-        private UdpSender _udpSender;
-
         public MainWindow()
         {
             InitializeComponent();
-            this.Closed += MainWindow_Closed;
+            this.Closed += new EventHandler(delegate (Object o, EventArgs e) { ReleaseResources(); });
 
             UpdateDeviceList();
 
             this._openVideoDeviceButton.Click += _openVideoDeviceButton_Click;
             this._connectionButton.Click += _connectionButton_Click;
-            this._refreshVideoDeviceButton.Click += _refreshVideoDeviceButton_Click;
+            this._refreshVideoDeviceButton.Click += new RoutedEventHandler(delegate (Object o, RoutedEventArgs a) { UpdateDeviceList(); });
+
+            Task.Run(ReceivedMessageAsync);
         }
 
-        private void _udpListener_DataReceivedEvent(byte[] data)
+        private void ReleaseResources()
         {
-            try
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    using (var ms = new MemoryStream(data))
-                    {
-                        BitmapImage bmp = new BitmapImage();
-                        bmp.BeginInit();
-                        bmp.CacheOption = BitmapCacheOption.OnLoad;
-                        bmp.StreamSource = ms;
-                        bmp.EndInit();
-
-                        this._inputWebCameraImage.Source = bmp;
-                    }
-                });
-            }
-            catch(Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-           
-        }
-
-        private void _refreshVideoDeviceButton_Click(object sender, RoutedEventArgs e)
-        {
-            UpdateDeviceList();
+            if (_videoCaptureDevice.IsRunning) _videoCaptureDevice.Stop();
         }
 
         private void _connectionButton_Click(object sender, RoutedEventArgs e)
         {
-            if (_udpListener != null) _udpListener = null;
-            if (_udpSender != null) _udpSender = null;
-
-            _udpSender = new UdpSender(IPAddress.Parse(this._destinationIp.Text), int.Parse(this._destinationPort.Text));
-
-            _udpListener = new UdpListener(int.Parse(this._inputUdpPort.Text));
-            _udpListener.DataReceivedEvent += _udpListener_DataReceivedEvent;
-        }
-
-        private void MainWindow_Closed(object sender, EventArgs e)
-        {
-            _udpSender = null;
-            _udpListener = null;
-            if (_videoCaptureDevice.IsRunning) _videoCaptureDevice.Stop();
+            udpReceiver = new UdpClient(int.Parse(this._inputUdpPort.Text), AddressFamily.InterNetworkV6);
+            remotePort = int.Parse(this._destinationPort.Text);
+            remoteIp = this._destinationIp.Text;
         }
 
         private VideoCaptureDevice _videoCaptureDevice = null;
@@ -116,19 +111,12 @@ namespace VideoStreamAppWpf
 
             if (descriptor != "")
             {
-                if (_videoCaptureDevice == null)
-                {
-                    _videoCaptureDevice = new VideoCaptureDevice(descriptor);
-                    _videoCaptureDevice.VideoSourceError += _videoCaptureDevice_VideoSourceError;
-                    _videoCaptureDevice.NewFrame += _videoCaptureDevice_NewFrame;
-                    _videoCaptureDevice.Start();
-                }
-                else
-                {
-                    if (_videoCaptureDevice.IsRunning) _videoCaptureDevice.Stop();
-                    _videoCaptureDevice.Source = descriptor;
-                    _videoCaptureDevice.Start();
-                }
+                if (_videoCaptureDevice != null && _videoCaptureDevice.IsRunning) _videoCaptureDevice.Stop();
+                _videoCaptureDevice = null;
+                _videoCaptureDevice = new VideoCaptureDevice(descriptor);
+                _videoCaptureDevice.VideoSourceError += _videoCaptureDevice_VideoSourceError;
+                _videoCaptureDevice.NewFrame += _videoCaptureDevice_NewFrame;
+                _videoCaptureDevice.Start();
             }
         }
 
@@ -137,40 +125,33 @@ namespace VideoStreamAppWpf
             Console.WriteLine(eventArgs.Description);
         }
 
+        private string remoteIp;
+        private int remotePort;
+
         private void _videoCaptureDevice_NewFrame(object sender, AForge.Video.NewFrameEventArgs eventArgs)
         {
             try
             {
-                Dispatcher.Invoke(() => 
+                Dispatcher.Invoke(() =>
                 {
-                    using (var memStream = new MemoryStream())
+                    using (MemoryStream ms = new MemoryStream())
                     {
-                        var frame = eventArgs.Frame;
-                        frame.Save(memStream, ImageFormat.Jpeg);
-                        memStream.Seek(0, SeekOrigin.Begin);
+                        Bitmap bitmap = new Bitmap(eventArgs.Frame, 800, 600);
+                        bitmap.Save(ms, ImageFormat.Jpeg);
+                        ms.Seek(0, SeekOrigin.Begin);
 
+                        BitmapImage image = new BitmapImage();
+                        image.BeginInit();
+                        image.StreamSource = ms;
+                        image.CacheOption = BitmapCacheOption.OnLoad;
+                        image.EndInit();
 
-                        int bps = frame.Width * frame.Height * System.Drawing.Image.GetPixelFormatSize(frame.PixelFormat) * frame.GetFrameCount(FrameDimension.Resolution);
-                        
+                        this._outputWebCameraImage.Source = image;
 
-                        BitmapImage bmp = new BitmapImage();
-                        bmp.BeginInit();
-                        bmp.CacheOption = BitmapCacheOption.OnLoad;
-                        bmp.StreamSource = memStream;
-                        bmp.EndInit();
-
-                        this._outputWebCameraImage.Source = bmp;
-                        
-                        if (_udpSender != null)
-                        {
-                            using (var zipMemStream = new MemoryStream())
-                            {
-                                Bitmap outputBmp = new Bitmap(eventArgs.Frame, 800, 600);
-                                var data = zipMemStream.ToArray();
-                                _udpSender.Send(data);
-                            }
-                        }
-                      
+                        byte[] data = ms.ToArray();
+                        UdpClient udpSender = new UdpClient(AddressFamily.InterNetworkV6);
+                        udpSender.Send(data, data.Length, new IPEndPoint(IPAddress.Parse(remoteIp), remotePort));
+                        _statusTextBlock.Text = "Bytes sended: " + data.Length.ToString();
                     }
                 });
                

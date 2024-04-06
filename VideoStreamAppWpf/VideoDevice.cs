@@ -36,7 +36,7 @@ namespace VideoStreamAppWpf
         }
 
         private Collection<DeviceInfo> _deviceList { get; set; }
-        public Collection<DeviceInfo> DeviceList() { return _deviceList; }
+        public Collection<DeviceInfo> DeviceList() { return DeviceInfo.GetList(); }
         public void RefreshDeviceList() { _deviceList = DeviceInfo.GetList(); }
 
         private VideoCaptureDevice      _videoSourceDevice;

@@ -13,14 +13,6 @@
         </Style.Resources>
     </Style>
 
-    <Style TargetType="ComboBox">
-        <Setter Property="Background" Value="#222222"/>
-    </Style>
-
-    <Style TargetType="ComboBoxItem">
-        <Setter Property="Background" Value="#222222"/>
-    </Style>
-
     <Style TargetType="TextBox">
         <Setter Property="Background" Value="#222222" />
         <Setter Property="Foreground" Value="#FFFFFF" />
@@ -49,13 +41,26 @@
     <Style TargetType="ListBox">
         <Setter Property="Background" Value="#222222" />
         <Setter Property="BorderThickness" Value="0"/>
+        <Style.Resources>
+            <Style TargetType="Border">
+                <Setter Property="CornerRadius" Value="10"/>
+            </Style>
+        </Style.Resources>
     </Style>
 
     <Style TargetType="ListBoxItem">
         <Setter Property="Foreground" Value="White" />
         <Setter Property="Background" Value="#555555" />
-        <Setter Property="BorderBrush" Value="#56ADE3" />
         <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="FontSize" Value="18" />
     </Style>
+
+    <Style TargetType="Label">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="FontSize" Value="15"/>
+    </Style>
+
     
 </ResourceDictionary>

@@ -26,12 +26,16 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Linq.Expressions;
 using System.Diagnostics.Tracing;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace VideoStreamAppWpf
 {
     /// <summary>
     /// Логика взаимодействия для MainWindow.xaml
     /// </summary>
+    /// 
+    // сделать открытие вебки через кнопку подключения
     public partial class MainWindow : Window
     {
 
@@ -67,9 +71,9 @@ namespace VideoStreamAppWpf
 
         private void UpdateDeviceList()
         {
-            this._videoDeviceList.Items.Clear();
+            this._deviceListBox.Items.Clear();
             var list = VideoDevice.DeviceInfo.GetList();
-            foreach (var item in list) this._videoDeviceList.Items.Add(item.Name);
+            foreach (var item in list) this._deviceListBox.Items.Add(item.Name);
         }
 
         public MainWindow()
@@ -79,9 +83,9 @@ namespace VideoStreamAppWpf
 
             UpdateDeviceList();
 
-            this._openVideoDeviceButton.Click += _openVideoDeviceButton_Click;
-            this._connectionButton.Click += _connectionButton_Click;
-            this._refreshVideoDeviceButton.Click += new RoutedEventHandler(delegate (Object o, RoutedEventArgs a) { UpdateDeviceList(); });
+            this._connectButton.Click += _connectionButton_Click;
+            this._refreshDeviceListButton.Click += new RoutedEventHandler(delegate (Object o, RoutedEventArgs a) { UpdateDeviceList(); ToLog("Refreshing devices..."); });
+            this._clearLogButton.Click += new RoutedEventHandler(delegate (Object o, RoutedEventArgs a) { this._logTextBlock.Text = ""; });
 
             Task.Run(ReceivedMessageAsync);
         }
@@ -91,19 +95,18 @@ namespace VideoStreamAppWpf
             if (_videoCaptureDevice.IsRunning) _videoCaptureDevice.Stop();
         }
 
-        private void _connectionButton_Click(object sender, RoutedEventArgs e)
+        private void ToLog(string message)
         {
-            udpReceiver = new UdpClient(int.Parse(this._inputUdpPort.Text), AddressFamily.InterNetworkV6);
-            remotePort = int.Parse(this._destinationPort.Text);
-            remoteIp = this._destinationIp.Text;
+            Dispatcher.Invoke(() => 
+            {
+                this._logTextBlock.Text += message + "\n";
+            });
         }
 
-        private VideoCaptureDevice _videoCaptureDevice = null;
-
-
-        private void _openVideoDeviceButton_Click(object sender, RoutedEventArgs e)
+        private void _connectionButton_Click(object sender, RoutedEventArgs e)
         {
-            var selectedItem = this._videoDeviceList.SelectedItem;
+            ToLog("Connection Init");
+            var selectedItem = this._deviceListBox.SelectedItem;
 
             var deviceList = VideoDevice.DeviceInfo.GetList();
             string descriptor = "";
@@ -118,7 +121,13 @@ namespace VideoStreamAppWpf
                 _videoCaptureDevice.NewFrame += _videoCaptureDevice_NewFrame;
                 _videoCaptureDevice.Start();
             }
+
+            udpReceiver = new UdpClient(int.Parse(this._inputPortTextBox.Text), AddressFamily.InterNetworkV6);
+            remotePort = int.Parse(this._remotePortTextBox.Text);
+            remoteIp = this._remoteIpTextBox.Text;
         }
+
+        private VideoCaptureDevice _videoCaptureDevice = null;
 
         private void _videoCaptureDevice_VideoSourceError(object sender, AForge.Video.VideoSourceErrorEventArgs eventArgs)
         {
@@ -150,7 +159,7 @@ namespace VideoStreamAppWpf
 
                         byte[] data = ms.ToArray();
                         UdpClient udpSender = new UdpClient(AddressFamily.InterNetworkV6);
-                        udpSender.Send(data, data.Length, new IPEndPoint(IPAddress.Parse(remoteIp), remotePort));
+                        if (data.Length < 65535) udpSender.Send(data, data.Length, new IPEndPoint(IPAddress.Parse(remoteIp), remotePort));
                         _statusTextBlock.Text = "Bytes sended: " + data.Length.ToString();
                     }
                 });

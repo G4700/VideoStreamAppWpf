@@ -93,12 +93,14 @@
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="0.2*"/>
                 </Grid.RowDefinitions>
-                
-                <TextBlock x:Name="_logTextBlock" Margin="5" Padding="10">
-                    <TextBlock.Background>#222222</TextBlock.Background>
-                    <TextBlock.Foreground>#56ADE3</TextBlock.Foreground>
-                    <TextBlock.FontSize>16</TextBlock.FontSize>
-                </TextBlock>
+
+                <ScrollViewer VerticalScrollBarVisibility="Hidden">
+                    <TextBlock x:Name="_logTextBlock" Margin="5" Padding="10" >
+                        <TextBlock.Background>#222222</TextBlock.Background>
+                        <TextBlock.Foreground>#56ADE3</TextBlock.Foreground>
+                        <TextBlock.FontSize>16</TextBlock.FontSize>
+                    </TextBlock>
+                </ScrollViewer>
 
                 <Button x:Name="_clearLogButton" Margin="5" Grid.Row="1">Clear Log</Button>
             </Grid>

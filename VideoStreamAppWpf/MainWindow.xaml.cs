@@ -36,36 +36,36 @@ namespace VideoStreamAppWpf
     /// 
     public partial class MainWindow : Window
     {
-        private void UdpProviderReceiveHandler(MemoryStream ms)
-        {
-            Dispatcher.Invoke(() =>
-            {
-                UpdateImage(ms, this._inputWebCameraImage);
-            });
-        }
-
         public MainWindow()
         {
             InitializeComponent();
 
-            this._connectButton.Click += ConnectionButtonClick;
-            this._refreshDeviceListButton.Click += RefreshDeviceListButtonClick;
-            this._clearLogButton.Click += ClearLogButtonClick;
+            this._connectButton.Click                   += ConnectionButtonClick;
+            this._refreshDeviceListButton.Click         += RefreshDeviceListButtonClick;
+            this._clearLogButton.Click                  += ClearLogButtonClick;
 
-            this._videoDevice.NewFrameEvent += VideoDeviceNewFrameEventHandler;
-            this._videoDevice.NotificationEvent += ToLog;
-            this._videoDevice.ErrorEvent += ToLog;
-            this._videoDevice.ParametersChangedEvent += VideoDeviceParametersUpdateHandler;
-            this._ipVersionComboBox.SelectionChanged += IpVersionSelectChanged;
+            this._videoDevice.NewFrameEvent             += VideoDeviceNewFrameEventHandler;
+            this._videoDevice.NotificationEvent         += ToLog;
+            this._videoDevice.ErrorEvent                += ToLog;
+            this._videoDevice.ParametersChangedEvent    += VideoDeviceParametersUpdateHandler;
+            this._ipVersionComboBox.SelectionChanged    += IpVersionSelectChanged;
             
-            this._udpProvider.ReceiveEvent += UdpProviderReceiveHandler;
-            this._udpProvider.ErrorEvent += ToLog;
+            this._udpProvider.ReceiveEvent              += UdpProviderReceiveHandler;
+            this._udpProvider.ErrorEvent                += ToLog;
 
             this._remoteIpTextBox.Text = "::1";
             this._remotePortTextBox.Text = "8000";
             this._inputPortTextBox.Text = "8000";
 
             this._parametersTextBlock.DataContext = _videoDevice.GetParameters();
+        }
+
+        private void UdpProviderReceiveHandler(MemoryStream ms)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                UpdateImage(ms, this._inputWebCameraImage);
+            });
         }
 
         private void VideoDeviceParametersUpdateHandler(VideoDevice.Parameters parameters)
@@ -116,15 +116,11 @@ namespace VideoStreamAppWpf
             {
                 ToLog("App: " + ex.Message);
             }
-                   }
-
-        private VideoDevice _videoDevice = new VideoDevice(800, 600);
-        private UdpProvider _udpProvider = new UdpProvider();
+        }
 
         private void ToLog(string message) { Dispatcher.Invoke(() => 
         { 
             this._logTextBlock.Text += message + "\n"; });
-            Arg1 = message;
         }
 
         private void VideoDeviceNewFrameEventHandler(MemoryStream ms)
@@ -149,6 +145,7 @@ namespace VideoStreamAppWpf
             image.Source = bmp;
         }
 
-        public string Arg1 = "asd";
+        private VideoDevice _videoDevice = new VideoDevice(800, 600);
+        private UdpProvider _udpProvider = new UdpProvider();
     }
 }

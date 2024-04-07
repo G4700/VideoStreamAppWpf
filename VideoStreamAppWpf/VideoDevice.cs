@@ -60,6 +60,7 @@ namespace VideoStreamAppWpf
 
         public Collection<string> GetDeviceNames()
         {
+            _devices = GetDevicesList();
             Collection<string> names = new Collection<string>();
             foreach (DeviceInfo device in _devices) names.Add(device.Name);
             return names;
@@ -103,7 +104,7 @@ namespace VideoStreamAppWpf
 
         public void Close()
         {
-            _videoCaptureDevice.Stop();
+            _videoCaptureDevice?.Stop();
             _videoCaptureDevice = null;
         }
 
@@ -112,6 +113,13 @@ namespace VideoStreamAppWpf
             _width = width;
             _height = height;
         }
+
+        ~VideoDevice()
+        {
+            this.Close();
+        }
+
+        public bool IsRunning() { return _videoCaptureDevice.IsRunning; }
 
         private int _width;
         private int _height;

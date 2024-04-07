@@ -26,6 +26,7 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Linq.Expressions;
 using System.Diagnostics.Tracing;
+using System.ComponentModel;
 
 namespace VideoStreamAppWpf
 {
@@ -54,6 +55,7 @@ namespace VideoStreamAppWpf
             this._videoDevice.NewFrameEvent += VideoDeviceNewFrameEventHandler;
             this._videoDevice.NotificationEvent += ToLog;
             this._videoDevice.ErrorEvent += ToLog;
+            this._videoDevice.ParametersChangedEvent += VideoDeviceParametersUpdateHandler;
             this._ipVersionComboBox.SelectionChanged += IpVersionSelectChanged;
             
             this._udpProvider.ReceiveEvent += UdpProviderReceiveHandler;
@@ -62,6 +64,19 @@ namespace VideoStreamAppWpf
             this._remoteIpTextBox.Text = "::1";
             this._remotePortTextBox.Text = "8000";
             this._inputPortTextBox.Text = "8000";
+
+            this._parametersTextBlock.DataContext = _videoDevice.GetParameters();
+        }
+
+        private void VideoDeviceParametersUpdateHandler(VideoDevice.Parameters parameters)
+        {
+            Dispatcher.Invoke(() => 
+            {
+                this._parametersTextBlock.Text = 
+                $"Raw Frame Size: {parameters.RawFrameSize}\n" +
+                $"Output Frame Size: {parameters.OutputFrameSize}\n" +
+                $"Frame Bytes Received: {parameters.FrameBytesReceived}\n";
+            });
         }
 
         private void IpVersionSelectChanged(object sender, SelectionChangedEventArgs e)
@@ -88,20 +103,28 @@ namespace VideoStreamAppWpf
 
         private void ConnectionButtonClick(object sender, RoutedEventArgs e)
         {
-            _videoDevice.Open(this._deviceListBox.SelectedItem.ToString());
+            try
+            {
+                _videoDevice.Open(this._deviceListBox.SelectedItem?.ToString());
 
-            _udpProvider.RemoteIp = this._remoteIpTextBox.Text;
-            _udpProvider.RemotePort = this._remotePortTextBox.Text;
-            _udpProvider.InputPort = this._inputPortTextBox.Text;
-            _udpProvider.Open();
-        }
+                _udpProvider.RemoteIp = this._remoteIpTextBox.Text;
+                _udpProvider.RemotePort = this._remotePortTextBox.Text;
+                _udpProvider.InputPort = this._inputPortTextBox.Text;
+                _udpProvider.Open();
+            }
+            catch(Exception ex) 
+            {
+                ToLog("App: " + ex.Message);
+            }
+                   }
 
         private VideoDevice _videoDevice = new VideoDevice(800, 600);
         private UdpProvider _udpProvider = new UdpProvider();
 
         private void ToLog(string message) { Dispatcher.Invoke(() => 
         { 
-            this._logTextBlock.Text += message + "\n"; }); 
+            this._logTextBlock.Text += message + "\n"; });
+            Arg1 = message;
         }
 
         private void VideoDeviceNewFrameEventHandler(MemoryStream ms)
@@ -126,5 +149,6 @@ namespace VideoStreamAppWpf
             image.Source = bmp;
         }
 
+        public string Arg1 = "asd";
     }
 }

@@ -3,12 +3,14 @@ using Emgu.CV;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Runtime.CompilerServices;
 
 namespace VideoStreamAppWpf
 {
@@ -17,10 +19,39 @@ namespace VideoStreamAppWpf
         public delegate void NewFrameHandler(MemoryStream ms);
         public delegate void NotificationHandler(string msg);
         public delegate void ErrorHandler(string msg);
+        public delegate void ParametersChanged(Parameters prms);
         public event NewFrameHandler NewFrameEvent;
         public event ErrorHandler ErrorEvent;
         public event NotificationHandler NotificationEvent;
+        public event ParametersChanged ParametersChangedEvent;
 
+        public class Parameters : INotifyPropertyChanged
+        {
+            public void Update(VideoDevice dev, AForge.Video.NewFrameEventArgs e)
+            {
+                _rawFrameSize = e.Frame.Size;
+                _outputFrameSize = new Size(dev._width, dev._height);
+                _frameBytesReceived = dev._videoCaptureDevice.BytesReceived;
+
+                dev.ParametersChangedEvent?.Invoke(this);
+            }
+
+            private Size    _rawFrameSize;
+            private Size    _outputFrameSize;
+            private long    _frameBytesReceived;
+
+            public Size RawFrameSize           { get { return _rawFrameSize; } }
+            public Size OutputFrameSize        { get { return _outputFrameSize; } }
+            public long FrameBytesReceived     { get { return _frameBytesReceived; } }
+
+
+            public event PropertyChangedEventHandler PropertyChanged;
+            public void OnPropertyChanged([CallerMemberName] string prop = "")
+            {
+                if (PropertyChanged != null) PropertyChanged(this, new PropertyChangedEventArgs(prop));
+            }
+        }
+        
         public class DeviceInfo
         {
             public String Name { get; }
@@ -41,6 +72,7 @@ namespace VideoStreamAppWpf
                 Bitmap bitmap = new Bitmap(e.Frame, _width, _height);
                 bitmap.Save(ms, ImageFormat.Jpeg);
                 ms.Seek(0, SeekOrigin.Begin);
+                _parameters.Update(this, e);
                 NewFrameEvent?.Invoke(ms);
             }
         }
@@ -120,10 +152,12 @@ namespace VideoStreamAppWpf
         }
 
         public bool IsRunning() { return _videoCaptureDevice.IsRunning; }
+        public Parameters GetParameters() { return _parameters; }
 
         private int _width;
         private int _height;
         private VideoCaptureDevice _videoCaptureDevice = new VideoCaptureDevice();
         private Collection<DeviceInfo> _devices = new Collection<DeviceInfo>(GetDevicesList());
+        private Parameters _parameters = new Parameters();
     }
 }

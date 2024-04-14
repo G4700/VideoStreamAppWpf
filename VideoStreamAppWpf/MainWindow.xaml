@@ -105,7 +105,7 @@
                 <Button x:Name="_clearLogButton" Margin="5" Grid.Row="1">Clear Log</Button>
             </Grid>
 
-            <TextBlock x:Name="_parametersTextBlock" Margin="5" Padding="10" Grid.Column="0">
+            <TextBlock x:Name="_parametersTextBlock" Margin="5" Padding="10" Grid.Column="0" TextWrapping="WrapWithOverflow">
                 <TextBlock.Background>#222222</TextBlock.Background>
                 <TextBlock.Foreground>#56ADE3</TextBlock.Foreground>
                 <TextBlock.FontSize>16</TextBlock.FontSize>

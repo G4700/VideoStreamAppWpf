@@ -34,8 +34,31 @@ namespace VideoStreamAppWpf
     /// Логика взаимодействия для MainWindow.xaml
     /// </summary>
     /// 
+    public delegate void ErrorHandler(string msg);
+    public delegate void ReceiveHandler(MemoryStream ms);
+    public delegate void NotificationHandler(string msg);
+
+    interface NetProvider
+    {
+        event ErrorHandler ErrorEvent;
+        event ReceiveHandler ReceiveEvent;
+        event NotificationHandler NotificationEvent;
+
+        AddressFamily AddressFamily { get; set; }
+        string RemoteIp { get; set; }
+        string RemotePort { get; set; }
+        string InputPort { get; set; }
+
+
+        void Open();
+        void Send(byte[] data);
+        void Close();
+    }
+
     public partial class MainWindow : Window
     {
+        
+
         public MainWindow()
         {
             InitializeComponent();
@@ -49,13 +72,11 @@ namespace VideoStreamAppWpf
             this._videoDevice.ErrorEvent                += ToLog;
             this._videoDevice.ParametersChangedEvent    += VideoDeviceParametersUpdateHandler;
             this._ipVersionComboBox.SelectionChanged    += IpVersionSelectChanged;
-            
-            this._udpProvider.ReceiveEvent              += UdpProviderReceiveHandler;
-            this._udpProvider.ErrorEvent                += ToLog;
+            this._protocolTypeComboBox.SelectionChanged += ProtocolSelectChanged;
 
-            this._remoteIpTextBox.Text = "::1";
-            this._remotePortTextBox.Text = "8000";
-            this._inputPortTextBox.Text = "8000";
+            this._remoteIpTextBox.Text      = "2620:9b::1928:54e1";
+            this._remotePortTextBox.Text    = "8000";
+            this._inputPortTextBox.Text     = "8001";
 
             this._parametersTextBlock.DataContext = _videoDevice.GetParameters();
         }
@@ -84,8 +105,18 @@ namespace VideoStreamAppWpf
             ComboBoxItem comboBoxItem = this._ipVersionComboBox.SelectedItem as ComboBoxItem;
             switch(comboBoxItem.Content.ToString())
             {
-                case "IPv4": _udpProvider.AddressFamily = AddressFamily.InterNetwork;       break;
-                case "IPv6": _udpProvider.AddressFamily = AddressFamily.InterNetworkV6;     break;
+                case "IPv4": _ipType = AddressFamily.InterNetwork;       break;
+                case "IPv6": _ipType = AddressFamily.InterNetworkV6;     break;
+            }
+        }
+
+        private void ProtocolSelectChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ComboBoxItem comboBoxItem = this._protocolTypeComboBox.SelectedItem as ComboBoxItem;
+            switch (comboBoxItem.Content.ToString())
+            {
+                case "UDP": _protocol = "UDP"; break;
+                case "TCP": _protocol = "TCP"; break;
             }
         }
 
@@ -105,12 +136,29 @@ namespace VideoStreamAppWpf
         {
             try
             {
-                _videoDevice.Open(this._deviceListBox.SelectedItem?.ToString());
+                _netProvider?.Close();
+                _netProvider = null;
 
-                _udpProvider.RemoteIp = this._remoteIpTextBox.Text;
-                _udpProvider.RemotePort = this._remotePortTextBox.Text;
-                _udpProvider.InputPort = this._inputPortTextBox.Text;
-                _udpProvider.Open();
+                _videoDevice?.Close();
+                _videoDevice?.Open(this._deviceListBox.SelectedItem?.ToString());
+
+                if (_protocol == "UDP") 
+                { 
+                    _netProvider = new UdpProvider(); 
+                }
+                else if (_protocol == "TCP") 
+                { 
+                    _netProvider = new TcpProvider(); 
+                }
+
+                _netProvider.RemoteIp           = this._remoteIpTextBox.Text;
+                _netProvider.RemotePort         = this._remotePortTextBox.Text;
+                _netProvider.InputPort          = this._inputPortTextBox.Text;
+                _netProvider.AddressFamily      = _ipType;
+                _netProvider.ReceiveEvent       += UdpProviderReceiveHandler;
+                _netProvider.NotificationEvent  += ToLog;
+                _netProvider.ErrorEvent         += ToLog;
+                _netProvider?.Open();
             }
             catch(Exception ex) 
             {
@@ -129,7 +177,7 @@ namespace VideoStreamAppWpf
             {
                 UpdateImage(ms, this._outputWebCameraImage);
                 byte[] data = ms.ToArray();
-                _udpProvider?.SendSync(data);
+                _netProvider?.Send(data);
                 _statusTextBlock.Text = "Bytes sended: " + data.Length.ToString();
             });
         }
@@ -145,7 +193,9 @@ namespace VideoStreamAppWpf
             image.Source = bmp;
         }
 
+        private string _protocol = "UDP";
+        private AddressFamily _ipType = AddressFamily.InterNetwork;
+        private NetProvider _netProvider;
         private VideoDevice _videoDevice = new VideoDevice(800, 600);
-        private UdpProvider _udpProvider = new UdpProvider();
     }
 }

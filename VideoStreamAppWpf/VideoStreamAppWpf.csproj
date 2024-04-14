@@ -112,6 +112,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="TcpProvider.cs" />
     <Compile Include="UdpProvider.cs" />
     <Compile Include="VideoDevice.cs" />
     <Page Include="MainWindow.xaml">

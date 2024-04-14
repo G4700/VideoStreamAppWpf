@@ -12,15 +12,13 @@ using Emgu.CV.Util;
 
 namespace VideoStreamAppWpf
 {
-    public partial class UdpProvider
+    public partial class UdpProvider : NetProvider
     {
-        public delegate void ErrorHandler(string msg);
-        public delegate void ReceiveHandler(MemoryStream ms);
         public event ErrorHandler ErrorEvent;
         public event ReceiveHandler ReceiveEvent;
+        public event NotificationHandler NotificationEvent;
 
-
-        public void SendSync(byte[] data)
+        public void Send(byte[] data)
         {
             try
             {
@@ -35,9 +33,9 @@ namespace VideoStreamAppWpf
             }
         }
 
-        public void SendSync(MemoryStream ms) 
+        public void Send(MemoryStream ms) 
         { 
-            SendSync(ms.ToArray()); 
+            Send(ms.ToArray()); 
         }
 
         private async void ReceiveMessageAsyncProcess()

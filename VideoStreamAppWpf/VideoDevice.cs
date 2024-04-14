@@ -116,7 +116,7 @@ namespace VideoStreamAppWpf
 
             try
             {
-                _videoCaptureDevice.Stop();
+                _videoCaptureDevice?.Stop();
                 _videoCaptureDevice = null;
                 _videoCaptureDevice = new VideoCaptureDevice(GetDescriptor(name));
                 _videoCaptureDevice.NewFrame += FrameGetHandler;
